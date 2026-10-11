@@ -10,7 +10,8 @@
   "r2_buckets": [
     {
       "binding": "SYNC_BUCKET",
-      "bucket_name": "bienen-doku-pflicht-sync"
+      "bucket_name": "bienen-doku-pflicht-sync",
+      "jurisdiction": "eu"
     }
   ],
   "observability": {
