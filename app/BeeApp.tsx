@@ -562,7 +562,7 @@ const formConfigs: Record<Exclude<RecordType, "treatment">, {
 
 type VoiceRecognitionEvent = { results: ArrayLike<{ 0: { transcript: string }; isFinal?: boolean }> };
 type VoiceRecognitionErrorEvent = { error?: string };
-type VoiceRecognition = { lang: string; interimResults: boolean; continuous: boolean; start: () => void; stop: () => void; abort: () => void; onresult: ((event: VoiceRecognitionEvent) => void) | null; onerror: ((event: VoiceRecognitionErrorEvent) => void) | null; onend: (() => void) | null };
+type VoiceRecognition = { lang: string; interimResults: boolean; continuous: boolean; maxAlternatives?: number; start: () => void; stop: () => void; abort: () => void; onresult: ((event: VoiceRecognitionEvent) => void) | null; onerror: ((event: VoiceRecognitionErrorEvent) => void) | null; onend: (() => void) | null };
 type VoiceRecognitionConstructor = new () => VoiceRecognition;
 
 const voiceSteps = [
@@ -734,30 +734,68 @@ function GlobalVoiceControl({ activeForm, openForm, goTo, onNotice }: {
   const retryRef = useRef(0);
   const transcriptBufferRef = useRef("");
   const responseTimerRef = useRef<number | null>(null);
-  const ignoreNextEndRef = useRef(false);
+  const isListeningRef = useRef(false);
+  const handlingRef = useRef(false);
+  const speechSequenceRef = useRef(0);
+  const spokenPromptRef = useRef("");
+  const activeFormRef = useRef(activeForm);
+  const handleRef = useRef<(answer: string) => void>(() => {});
+  const restartTimerRef = useRef<number | null>(null);
+  activeFormRef.current = activeForm;
   const browserWindow = typeof window === "undefined" ? null : window as typeof window & { SpeechRecognition?: VoiceRecognitionConstructor; webkitSpeechRecognition?: VoiceRecognitionConstructor };
   const supported = Boolean(browserWindow && (browserWindow.SpeechRecognition || browserWindow.webkitSpeechRecognition) && "speechSynthesis" in window);
 
   const fields = () => Array.from(document.querySelectorAll<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>(".entry-form input:not([type=file]),.entry-form select,.entry-form textarea"));
   const labelOf = (element: HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement) => element.closest(".field")?.querySelector(":scope > span")?.textContent?.replace("*", "").trim() || element.closest(".confirmation-field")?.textContent?.replace("*", "").trim() || element.name || "nächstes Feld";
-  const listen = () => {
-    if (!activeRef.current) return;
-    try { recognitionRef.current?.start(); setStatus("Ich höre zu – sprich ganz in Ruhe …"); }
-    catch { window.setTimeout(() => { if (activeRef.current) try { recognitionRef.current?.start(); setStatus("Ich höre zu – sprich ganz in Ruhe …"); } catch {} }, 450); }
-  };
   const resetResponse = () => {
     transcriptBufferRef.current = "";
-    if (responseTimerRef.current) window.clearTimeout(responseTimerRef.current);
+    if (responseTimerRef.current !== null) window.clearTimeout(responseTimerRef.current);
     responseTimerRef.current = null;
   };
+  const listen = () => {
+    if (!activeRef.current || isListeningRef.current || handlingRef.current) return;
+    if (restartTimerRef.current !== null) window.clearTimeout(restartTimerRef.current);
+    restartTimerRef.current = null;
+    try {
+      recognitionRef.current?.start();
+      isListeningRef.current = true;
+      setStatus("Mikrofon aktiv – ich höre sofort zu. Du kannst auch eine Ansage unterbrechen.");
+    } catch {
+      // Some engines still have an audio session closing. Retry after it releases the mic.
+      restartTimerRef.current = window.setTimeout(listen, 550);
+    }
+  };
+  const queueListen = (delay = 150) => {
+    if (restartTimerRef.current !== null) window.clearTimeout(restartTimerRef.current);
+    restartTimerRef.current = window.setTimeout(() => { restartTimerRef.current = null; listen(); }, delay);
+  };
   const speak = (text: string, thenListen = true, after?: () => void) => {
+    speechSequenceRef.current += 1;
+    const sequence = speechSequenceRef.current;
     window.speechSynthesis.cancel();
+    spokenPromptRef.current = text;
     if (thenListen) resetResponse();
-    ignoreNextEndRef.current = true;
-    recognitionRef.current?.abort();
-    const utterance = new SpeechSynthesisUtterance(text); utterance.lang = "de-DE"; utterance.rate = .9; utterance.pitch = 1;
-    utterance.onend = () => { after?.(); if (thenListen) listen(); };
-    setStatus(text); window.speechSynthesis.speak(utterance);
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = "de-DE"; utterance.rate = 1; utterance.pitch = 1;
+    utterance.onend = () => {
+      if (sequence !== speechSequenceRef.current || !activeRef.current) return;
+      after?.();
+      queueListen(80);
+    };
+    utterance.onerror = () => {
+      if (sequence !== speechSequenceRef.current || !activeRef.current) return;
+      after?.();
+      queueListen(80);
+    };
+    setStatus(text);
+    window.speechSynthesis.speak(utterance);
+    // Listening stays enabled during prompts, so a user's answer may interrupt TTS.
+    queueListen(80);
+  };
+  const isPromptEcho = (value: string) => {
+    const heard = voiceComparable(value);
+    const prompt = voiceComparable(spokenPromptRef.current);
+    return heard.length >= 10 && (prompt.startsWith(heard) || (heard.length >= 22 && prompt.includes(heard)));
   };
   const promptFor = (element: HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement) => {
     const label = labelOf(element);
@@ -772,13 +810,14 @@ function GlobalVoiceControl({ activeForm, openForm, goTo, onNotice }: {
   };
   const askField = (index: number) => {
     window.setTimeout(() => {
+      if (!activeRef.current) return;
       const formFields = fields();
       if (!formFields.length) return speak("Das Formular wird geöffnet. Einen Moment bitte.");
       const next = Math.max(0, Math.min(index, formFields.length - 1));
       fieldIndexRef.current = next; setFieldIndex(next);
       formFields[next].scrollIntoView({ behavior: "smooth", block: "center" });
       speak(promptFor(formFields[next]));
-    }, 350);
+    }, 180);
   };
   const setFieldValue = (element: HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement, spoken: string) => {
     let value = spoken.trim();
@@ -806,7 +845,7 @@ function GlobalVoiceControl({ activeForm, openForm, goTo, onNotice }: {
       [["durchsicht", "kontrolle"], "inspection"], [["behandlung", "arzneimittel"], "treatment"], [["fütterung", "futter"], "feeding"], [["honigernte", "ernte"], "harvest"], [["hygiene", "reinigung"], "hygiene"], [["krankheit", "verdacht", "seuche"], "disease"], [["bienenstand", "stand anlegen"], "apiary"], [["bienenvolk", "volk anlegen"], "colony"], [["zuchtserie"], "queenSeries"], [["königin"], "queen"], [["notiz", "bemerkung"], "note"],
     ];
     const match = actions.find(([words]) => words.some((word) => command.includes(word)));
-    if (match) { openForm(match[1]); fieldIndexRef.current = 0; setFieldIndex(0); window.setTimeout(() => askField(0), 500); return true; }
+    if (match) { activeFormRef.current = match[1]; openForm(match[1]); fieldIndexRef.current = 0; setFieldIndex(0); window.setTimeout(() => askField(0), 500); return true; }
     const views: Array<[string[], View]> = [[["übersicht", "startseite"], "dashboard"], [["einträge", "chronik"], "records"], [["stände", "völker"], "apiaries"], [["königinnenzucht", "zuchtbereich"], "breeding"], [["export", "sicherung"], "export"], [["pflichten", "recht"], "legal"], [["hilfe", "handbuch"], "help"]];
     const view = views.find(([words]) => words.some((word) => command.includes(word)));
     if (view) { goTo(view[1]); speak(`${view[0][0]} ist geöffnet. Was möchtest du als Nächstes tun?`); return true; }
@@ -816,11 +855,11 @@ function GlobalVoiceControl({ activeForm, openForm, goTo, onNotice }: {
     const command = spoken.toLocaleLowerCase("de").trim();
     retryRef.current = 0; setLastHeard(spoken.trim());
     if (/sprachmodus (beenden|stoppen)|^stopp$/.test(command)) return stop();
-    if (command.includes("frage wiederholen") || command === "wiederholen") return activeForm && activeForm !== "chooser" ? askField(fieldIndexRef.current) : speak("Was möchtest du tun? Zum Beispiel Durchsicht, Behandlung, Notiz oder Königinnenzucht.");
+    if (command.includes("frage wiederholen") || command === "wiederholen") return activeFormRef.current && activeFormRef.current !== "chooser" ? askField(fieldIndexRef.current) : speak("Was möchtest du tun? Zum Beispiel Durchsicht, Behandlung, Notiz oder Königinnenzucht.");
     if (command.includes("durchsicht neu") || command.includes("formular neu") || command === "neu starten") { fieldIndexRef.current = 0; setFieldIndex(0); return askField(0); }
-    if (command.includes("abbrechen") || command.includes("formular schließen")) { openForm(null); return speak("Formular geschlossen. Was möchtest du tun?"); }
+    if (command.includes("abbrechen") || command.includes("formular schließen")) { activeFormRef.current = null; openForm(null); return speak("Formular geschlossen. Was möchtest du tun?"); }
     if (command === "speichern" || command.includes("eintrag speichern")) { const form = document.querySelector<HTMLFormElement>(".entry-form"); if (form) { form.requestSubmit(); speak("Der Eintrag wird gespeichert.", false); } else speak("Es ist kein Formular geöffnet."); return; }
-    if (!activeForm || activeForm === "chooser") { if (!chooseAction(command)) speak("Das habe ich nicht zugeordnet. Sage zum Beispiel Durchsicht, Behandlung, Fütterung, Notiz oder Königinnenzucht."); return; }
+    if (!activeFormRef.current || activeFormRef.current === "chooser") { if (!chooseAction(command)) speak("Das habe ich nicht zugeordnet. Sage zum Beispiel Durchsicht, Behandlung, Fütterung, Notiz oder Königinnenzucht."); return; }
     const formFields = fields();
     if (!formFields.length) return speak("Ich finde noch kein geöffnetes Formular.");
     const targetByName = formFields.findIndex((field) => command.includes(labelOf(field).toLocaleLowerCase("de")));
@@ -841,48 +880,99 @@ function GlobalVoiceControl({ activeForm, openForm, goTo, onNotice }: {
     if (fieldIndexRef.current >= formFields.length - 1) speak(`Eingetragen: ${result.value || "Nein"}. Alle Fragen sind durchlaufen. Sage speichern, korrigieren oder den Namen eines Feldes.`);
     else speak(`Eingetragen: ${result.value || "Nein"}.`, false, () => askField(fieldIndexRef.current + 1));
   };
+  handleRef.current = handle;
   function start() {
     if (!supported || !browserWindow) return onNotice("Sprachsteuerung wird in diesem Browser nicht unterstützt. Bitte Chrome oder Edge verwenden.");
-    const Recognition = browserWindow.SpeechRecognition || browserWindow.webkitSpeechRecognition; if (!Recognition) return;
-    const recognition = new Recognition(); recognition.lang = "de-DE"; recognition.interimResults = false; recognition.continuous = false;
+    const Recognition = browserWindow.SpeechRecognition || browserWindow.webkitSpeechRecognition;
+    if (!Recognition) return;
+    const recognition = new Recognition();
+    recognition.lang = "de-DE";
+    recognition.interimResults = true;
+    recognition.continuous = true;
+    recognition.maxAlternatives = 3;
+    const finishAnswer = () => {
+      if (!activeRef.current || handlingRef.current) return;
+      const answer = transcriptBufferRef.current.trim();
+      if (!answer) { resetResponse(); queueListen(); return; }
+      handlingRef.current = true;
+      if (responseTimerRef.current !== null) window.clearTimeout(responseTimerRef.current);
+      responseTimerRef.current = null;
+      try { recognition.abort(); } catch {}
+      const cleaned = answer;
+      resetResponse();
+      setLastHeard(cleaned);
+      try { handleRef.current(cleaned); }
+      finally {
+        handlingRef.current = false;
+        queueListen(220);
+      }
+    };
     recognition.onresult = (event) => {
-      const part = Array.from(event.results).map((result) => result[0]?.transcript || "").join(" ").replace(/\s+/g, " ").trim();
-      if (!part) return;
-      const finishNow = /(?:^|\s)(?:antwort\s+)?fertig[.!?]?$/i.test(part);
-      const cleanPart = part.replace(/(?:^|\s)(?:antwort\s+)?fertig[.!?]?$/i, "").trim();
-      if (cleanPart) transcriptBufferRef.current = `${transcriptBufferRef.current} ${cleanPart}`.replace(/\s+/g, " ").trim();
-      setLastHeard(transcriptBufferRef.current || part);
-      setStatus(finishNow ? "Antwort wird übernommen …" : "Ich höre weiter zu – du kannst nach einer Pause weitersprechen …");
-      if (responseTimerRef.current) window.clearTimeout(responseTimerRef.current);
-      responseTimerRef.current = window.setTimeout(() => {
-        const answer = transcriptBufferRef.current.trim();
-        responseTimerRef.current = null;
-        ignoreNextEndRef.current = true;
-        try { recognition.abort(); } catch {}
-        if (answer) handle(answer);
-      }, finishNow ? 120 : 4500);
+      if (!activeRef.current || handlingRef.current) return;
+      // Web Speech sends the full result list again on every update. Never append it.
+      const raw = Array.from(event.results).map((item) => item[0]?.transcript || "").join(" ").replace(/\s+/g, " ").trim();
+      if (!raw || isPromptEcho(raw)) return;
+      const finishNow = /(?:^|\s)(?:antwort\s+)?fertig[.!?]?$/i.test(raw);
+      const cleaned = raw.replace(/(?:^|\s)(?:antwort\s+)?fertig[.!?]?$/i, "").trim();
+      if (!cleaned && !finishNow) return;
+      if (window.speechSynthesis.speaking) {
+        speechSequenceRef.current += 1;
+        window.speechSynthesis.cancel();
+      }
+      transcriptBufferRef.current = cleaned;
+      setLastHeard(cleaned || raw);
+      setStatus(finishNow ? "Antwort wird übernommen …" : "Ich höre zu …");
+      if (responseTimerRef.current !== null) window.clearTimeout(responseTimerRef.current);
+      // Short fields react quickly. Longer notes allow more time for a natural pause.
+      const current = fields()[fieldIndexRef.current];
+      const freeText = current instanceof HTMLTextAreaElement || ["notes", "action", "description"].includes(current?.name || "");
+      responseTimerRef.current = window.setTimeout(finishAnswer, finishNow ? 80 : freeText ? 2400 : 1100);
     };
     recognition.onerror = (event) => {
       if (!activeRef.current || event.error === "aborted") return;
-      retryRef.current += 1;
-      if (event.error === "not-allowed" || event.error === "service-not-allowed") { stop(); onNotice("Mikrofonzugriff wurde nicht erlaubt. Bitte die Mikrofonberechtigung im Browser aktivieren."); return; }
-      if (retryRef.current <= 2) speak("Ich habe nichts verstanden. Bitte antworte noch einmal.");
-      else { retryRef.current = 0; speak("Die Verbindung zum Mikrofon war kurz unterbrochen. Ich wiederhole die Frage.", false, () => askField(fieldIndexRef.current)); }
+      if (event.error === "not-allowed" || event.error === "service-not-allowed" || event.error === "audio-capture") {
+        stop();
+        onNotice("Mikrofon nicht verfügbar. Bitte die Mikrofonberechtigung und das Eingabegerät prüfen.");
+        return;
+      }
+      // Silence or a temporary network interruption is not an answer. Reopen the mic.
+      setStatus("Ich höre weiter zu – bitte sprich noch einmal.");
     };
     recognition.onend = () => {
-      if (ignoreNextEndRef.current) { ignoreNextEndRef.current = false; return; }
-      window.setTimeout(() => {
-        if (!activeRef.current || window.speechSynthesis.speaking) return;
-        listen();
-      }, 250);
+      isListeningRef.current = false;
+      if (!activeRef.current || handlingRef.current) return;
+      if (transcriptBufferRef.current && responseTimerRef.current === null) finishAnswer();
+      else queueListen(200);
     };
-    recognitionRef.current = recognition; activeRef.current = true; setActive(true);
-    if (activeForm && activeForm !== "chooser") askField(fieldIndexRef.current); else speak("Sprachmodus gestartet. Was möchtest du tun? Zum Beispiel Durchsicht, Behandlung, Notiz oder Königinnenzucht.");
+    recognitionRef.current = recognition;
+    activeRef.current = true;
+    setActive(true);
+    resetResponse();
+    listen(); // Start the microphone immediately, before speech synthesis begins.
+    if (activeFormRef.current && activeFormRef.current !== "chooser") askField(fieldIndexRef.current);
+    else speak("Was möchtest du tun? Zum Beispiel Durchsicht, Behandlung, Fütterung oder Notiz.");
   }
-  function stop() { activeRef.current = false; setActive(false); resetResponse(); ignoreNextEndRef.current = true; recognitionRef.current?.abort(); window.speechSynthesis?.cancel(); setStatus("Sprachmodus beendet"); }
-  useEffect(() => () => { activeRef.current = false; if (responseTimerRef.current) window.clearTimeout(responseTimerRef.current); recognitionRef.current?.abort(); window.speechSynthesis?.cancel(); }, []);
+  function stop() {
+    activeRef.current = false;
+    setActive(false);
+    resetResponse();
+    speechSequenceRef.current += 1;
+    if (restartTimerRef.current !== null) window.clearTimeout(restartTimerRef.current);
+    restartTimerRef.current = null;
+    try { recognitionRef.current?.abort(); } catch {}
+    isListeningRef.current = false;
+    window.speechSynthesis?.cancel();
+    setStatus("Sprachmodus beendet");
+  }
+  useEffect(() => () => {
+    activeRef.current = false;
+    if (responseTimerRef.current !== null) window.clearTimeout(responseTimerRef.current);
+    if (restartTimerRef.current !== null) window.clearTimeout(restartTimerRef.current);
+    recognitionRef.current?.abort();
+    window.speechSynthesis?.cancel();
+  }, []);
   const totalFields = activeForm && activeForm !== "chooser" ? fields().length : 0;
-  return <aside className={`global-voice ${active ? "active" : ""}`} aria-live="polite"><button className="global-voice-main" onClick={active ? stop : start}><span>{active ? "■" : "🎙"}</span><b>{active ? "Sprachmodus stoppen" : "Sprachmodus starten"}</b></button>{active && <div className="global-voice-status"><span className="voice-pulse"/><div className="voice-status-copy"><b>{status}</b>{lastHeard && <span>Erkannt: „{lastHeard}“</span>}<small>{totalFields ? `Frage ${Math.min(fieldIndex + 1, totalFields)} von ${totalFields}` : "Menüauswahl"} · Du kannst in mehreren Sätzen frei sprechen</small><small>Sage „fertig“ für sofortige Übernahme oder warte etwa 4,5 Sekunden.</small><small>Befehle: wiederholen, zurück, korrigieren, überspringen, neu starten, speichern</small>{totalFields > 0 && <i className="voice-progress" aria-hidden="true"><i style={{ width: `${Math.max(4, ((fieldIndex + 1) / totalFields) * 100)}%` }} /></i>}</div></div>}</aside>;
+  return <aside className={`global-voice ${active ? "active" : ""}`} aria-live="polite"><button className="global-voice-main" onClick={active ? stop : start}><span>{active ? "■" : "🎙"}</span><b>{active ? "Sprachmodus stoppen" : "Sprachmodus starten"}</b></button>{active && <div className="global-voice-status"><span className="voice-pulse"/><div className="voice-status-copy"><b>{status}</b>{lastHeard && <span>Erkannt: „{lastHeard}“</span>}<small>{totalFields ? `Frage ${Math.min(fieldIndex + 1, totalFields)} von ${totalFields}` : "Menüauswahl"} · Du kannst die Ansage unterbrechen und direkt sprechen</small><small>Sage „fertig“ für sofortige Übernahme; kurze Antworten brauchen etwa 1 Sekunde Pause, längere Notizen 2,4 Sekunden.</small><small>Befehle: wiederholen, zurück, korrigieren, überspringen, neu starten, speichern</small>{totalFields > 0 && <i className="voice-progress" aria-hidden="true"><i style={{ width: `${Math.max(4, ((fieldIndex + 1) / totalFields) * 100)}%` }} /></i>}</div></div>}</aside>;
 }
 
 function GenericForm({ type, onSaved, onCancel }: { type: Exclude<RecordType, "treatment">; onSaved: (record: BeeRecord, notice?: string) => void; onCancel: () => void }) {
