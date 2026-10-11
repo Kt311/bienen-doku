@@ -1,6 +1,6 @@
-const SHELL_CACHE = "bienen-doku-shell-v45";
-const RUNTIME_CACHE = "bienen-doku-runtime-v45";
-const SHELL_FILES = ["/", "/manifest.webmanifest", "/favicon.svg", "/data/compliance-catalog.json"];
+const SHELL_CACHE = "bienen-doku-shell-v46";
+const RUNTIME_CACHE = "bienen-doku-runtime-v46";
+const SHELL_FILES = ["/", "/manifest.webmanifest", "/favicon.svg", "/icons/icon-192.png", "/icons/icon-512.png", "/icons/apple-touch-icon.png", "/data/compliance-catalog.json"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
