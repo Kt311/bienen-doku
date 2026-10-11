@@ -48,3 +48,6 @@ next-env.d.ts
 /backups/
 /exports/
 *.zip
+
+# PNG icons generated before every development/production build
+/public/icons/*.png

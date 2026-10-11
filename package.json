@@ -15,8 +15,11 @@
     "cloudflare:types": "wrangler types --env production worker-configuration.d.ts",
     "deploy:cloudflare:dry-run": "npm run build:cloudflare && wrangler deploy --dry-run",
     "deploy:cloudflare": "npm run build:cloudflare && wrangler deploy",
-    "test": "npm run build && node --test tests/rendered-html.test.mjs",
-    "lint": "eslint . --ignore-pattern dist --ignore-pattern .next"
+    "test": "npm run build && node --test tests/*.test.mjs",
+    "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
+    "predev": "node scripts/generate-pwa-icons.mjs",
+    "prebuild": "node scripts/generate-pwa-icons.mjs",
+    "prebuild:cloudflare": "node scripts/generate-pwa-icons.mjs"
   },
   "dependencies": {
     "next": "16.2.6",
