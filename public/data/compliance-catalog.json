@@ -1,0 +1,46 @@
+{
+  "version": "de-2026-09-27.1",
+  "verifiedAt": "2026-09-27",
+  "nextReviewDue": "2026-10-27",
+  "reviewIntervalDays": 30,
+  "productListDate": "2025-06",
+  "jurisdiction": "DE",
+  "notice": "Verbindlich sind die am Behandlungstag aktuelle Zulassung, Packungsbeilage und behördliche Vorgaben. Der Offline-Katalog kann gegenüber neuen oder ausgelaufenen Zulassungen zurückliegen und gibt keine Dosierung vor.",
+  "products": [
+    { "name": "Ameisensäure 60% ad us. vet.", "activeIngredient": "Ameisensäure", "availability": "freiverkäuflich", "colonyState": "Volk mit Brut", "note": "Vertriebsdauer laut LWG bis maximal 2027." },
+    { "name": "Ameisensäure 60 Bernburg", "activeIngredient": "Ameisensäure", "availability": "freiverkäuflich", "colonyState": "Volk mit Brut", "note": "Nachfolgepräparat für Ameisensäure 60%." },
+    { "name": "Formivar 60% ad us. vet.", "activeIngredient": "Ameisensäure", "availability": "freiverkäuflich", "colonyState": "Volk mit Brut", "note": "Vertriebsdauer laut LWG bis maximal 2027." },
+    { "name": "Formic Pro", "activeIngredient": "Ameisensäure", "availability": "freiverkäuflich", "colonyState": "Volk mit Brut", "note": "Nachfolgeartikel für MAQS seit 2022." },
+    { "name": "Apiguard", "activeIngredient": "Thymol", "availability": "freiverkäuflich", "colonyState": "Volk mit Brut" },
+    { "name": "Thymovar", "activeIngredient": "Thymol", "availability": "freiverkäuflich", "colonyState": "Volk mit Brut" },
+    { "name": "ApiLifeVar", "activeIngredient": "Thymol u. a.", "availability": "freiverkäuflich", "colonyState": "Volk mit Brut" },
+    { "name": "VarroMed", "activeIngredient": "Oxalsäure und Ameisensäure", "availability": "freiverkäuflich", "colonyState": "Volk mit Brut" },
+    { "name": "PolyVar Yellow", "activeIngredient": "Flumethrin", "availability": "frei in der Apotheke", "colonyState": "Volk mit Brut" },
+    { "name": "Bayvarol", "activeIngredient": "Flumethrin", "availability": "frei in der Apotheke", "colonyState": "Volk mit Brut" },
+    { "name": "Apitraz", "activeIngredient": "Amitraz", "availability": "rezeptpflichtig", "colonyState": "Volk mit Brut" },
+    { "name": "ApiVar", "activeIngredient": "Amitraz", "availability": "rezeptpflichtig", "colonyState": "Volk mit Brut" },
+    { "name": "Milchsäure 15% ad us. vet.", "activeIngredient": "Milchsäure", "availability": "freiverkäuflich", "colonyState": "Volk ohne Brut", "note": "Vertriebsdauer laut LWG bis maximal 2027." },
+    { "name": "Milchsäure 150 Bernburg", "activeIngredient": "Milchsäure", "availability": "freiverkäuflich", "colonyState": "Volk ohne Brut", "note": "Nachfolgepräparat für Milchsäure 15%." },
+    { "name": "Oxalsäuredihydrat-Lösung 3,5% (m/V) ad us. vet.", "activeIngredient": "Oxalsäure", "availability": "freiverkäuflich", "colonyState": "Volk ohne Brut", "note": "Vertriebsdauer laut LWG bis maximal 2027." },
+    { "name": "Oxalsäure Bernburg 40 mg/ml", "activeIngredient": "Oxalsäure", "availability": "freiverkäuflich", "colonyState": "Volk ohne Brut", "note": "Nachfolgepräparat für Oxalsäuredihydrat-Lösung 3,5%." },
+    { "name": "Oxuvar ad us. vet.", "activeIngredient": "Oxalsäure", "availability": "freiverkäuflich", "colonyState": "Volk ohne Brut", "note": "Vertriebsdauer laut LWG bis maximal 2027." },
+    { "name": "Oxuvar 5,7% ad us. vet.", "activeIngredient": "Oxalsäure", "availability": "freiverkäuflich", "colonyState": "Volk ohne Brut" },
+    { "name": "OxyBee / Bienenwohl", "activeIngredient": "Oxalsäure", "availability": "freiverkäuflich", "colonyState": "Volk ohne Brut" },
+    { "name": "Varroxal 0,71 g/g Bienenstock-Pulver", "activeIngredient": "Oxalsäure", "availability": "freiverkäuflich", "colonyState": "Volk ohne Brut", "note": "Sublimation nur mit Varrox Eddy oder Varrox Verdampfer; außerdem nach Packungsbeilage zum Träufeln und Sprühen." },
+    { "name": "Calistrip Biox 6,44 g imprägnierter Streifen", "activeIngredient": "Oxalsäure", "availability": "freiverkäuflich", "colonyState": "Volk ohne Brut" }
+  ],
+  "methods": [
+    { "id": "monitoring", "title": "Befalls- und Erfolgskontrolle", "category": "Kontrolle", "guidance": "Milbenbefall vor einer Behandlung ermitteln und den Behandlungserfolg anschließend kontrollieren; Methode und Ergebnis dokumentieren." },
+    { "id": "brood-interruption", "title": "Biotechnische Brutunterbrechung", "category": "Biotechnisch", "guidance": "Brutentnahme oder Käfigen der Königin nur fachgerecht und an die örtliche Situation angepasst durchführen; eine anschließende Arzneimittelanwendung separat dokumentieren." },
+    { "id": "brood-present", "title": "Behandlung im brütenden Volk", "category": "Arzneimittel", "guidance": "Nur ein aktuell zugelassenes und für die Situation geeignetes Präparat exakt nach Packungsbeilage anwenden." },
+    { "id": "brood-free", "title": "Restentmilbung im brutfreien Volk", "category": "Arzneimittel", "guidance": "Brutfreiheit prüfen und nur eine aktuell zugelassene Anwendungsart nach Packungsbeilage verwenden." }
+  ],
+  "sources": [
+    { "title": "LWG Bayern · Zugelassene Varroamittel", "url": "https://www.lwg.bayern.de/mam/cms06/bienen/dateien/varroabehandlungsmittel_mit_zulassung.pdf" },
+    { "title": "EU-Tierarzneimittel-Datenbank", "url": "https://medicines.health.europa.eu/veterinary/de" },
+    { "title": "LAVES · Rechtsnormen für Tierarzneimittel in der Imkerei", "url": "https://www.laves.niedersachsen.de/startseite/tiere/bienenkunde/informationsmaterial/neue-rechtsnormen-fur-tierarzneimittel-gelten-auch-fur-die-imkerei-208089.html" },
+    { "title": "LAVES · Winterliche Restentmilbung", "url": "https://www.laves.niedersachsen.de/startseite/tiere/bienenkunde/informationsmaterial/winterliche-restentmilbung-steht-bevor-246641.html" },
+    { "title": "Bundesrecht · Tierseuchenmeldeverordnung", "url": "https://www.gesetze-im-internet.de/tierseuchmeldv/BJNR03D0B0026.html" },
+    { "title": "LAVES · Varroose-Meldepflicht seit März 2026", "url": "https://www.laves.niedersachsen.de/startseite/tiere/bienenkunde/informationsmaterial/die-tierseuchenmeldeverordnung-eine-gesetzliche-neuregelung-die-auch-die-imkerei-insgesamt-betrifft-251779.html" }
+  ]
+}

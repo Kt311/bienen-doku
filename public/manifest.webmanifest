@@ -1,0 +1,16 @@
+{
+  "name": "Bienen Doku",
+  "short_name": "Bienen Doku",
+  "description": "Offline-Imkerei-Dokumentation mit ausschließlich lokaler Datenspeicherung.",
+  "id": "/",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#f6f4ec",
+  "theme_color": "#275f45",
+  "lang": "de",
+  "icons": [
+    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}
