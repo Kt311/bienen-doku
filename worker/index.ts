@@ -17,7 +17,13 @@ const worker = {
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), 7000);
         try {
-          const response = await fetch(source.url, { method: "HEAD", redirect: "follow", signal: controller.signal });
+          const response = await fetch(source.url, {
+            method: "GET",
+            redirect: "follow",
+            signal: controller.signal,
+            headers: { accept: "text/html,application/xhtml+xml,application/pdf;q=0.9,*/*;q=0.8", range: "bytes=0-2047" },
+          });
+          await response.body?.cancel();
           return { ...source, ok: response.ok, status: response.status, lastModified: response.headers.get("last-modified") };
         } catch {
           return { ...source, ok: false, status: 0, lastModified: null };
