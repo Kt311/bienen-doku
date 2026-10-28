@@ -1316,9 +1316,14 @@ export default function BeeApp({ displayName }: { displayName: string }) {
       setCatalog(next);
       const checkedAt = new Date().toISOString();
       setLastOnlineCatalogCheck(checkedAt);
+      await putMeta("lastOnlineCatalogCheck", checkedAt);
       try {
         const sourceResponse = await fetch("/api/compliance-check", { cache: "no-store" });
-        if (sourceResponse.ok) setSourceCheck(await sourceResponse.json() as SourceCheck);
+        if (sourceResponse.ok) {
+          const nextSourceCheck = await sourceResponse.json() as SourceCheck;
+          setSourceCheck(nextSourceCheck);
+          await putMeta("sourceCheck", nextSourceCheck);
+        }
       } catch {
         setSourceCheck(null);
       }
@@ -1348,6 +1353,13 @@ export default function BeeApp({ displayName }: { displayName: string }) {
 
     void getMeta<ComplianceCatalog>("complianceCatalog").then((savedCatalog) => {
       if (savedCatalog?.version && savedCatalog.products?.length && savedCatalog.nextReviewDue && Number.isInteger(savedCatalog.reviewIntervalDays)) setCatalog(savedCatalog);
+    });
+    void Promise.all([
+      getMeta<string>("lastOnlineCatalogCheck"),
+      getMeta<SourceCheck>("sourceCheck"),
+    ]).then(([savedCheckAt, savedSourceCheck]) => {
+      if (savedCheckAt) setLastOnlineCatalogCheck(savedCheckAt);
+      if (savedSourceCheck?.checkedAt) setSourceCheck(savedSourceCheck);
     });
     void Promise.all([
       getMeta<AutoBackupSettings>("autoBackupSettings"),
@@ -1518,7 +1530,9 @@ export default function BeeApp({ displayName }: { displayName: string }) {
   const initials = displayName.split(/\s+/).map((part) => part[0]).join("").slice(0, 2).toUpperCase() || "BD";
   const catalogDate = new Date(`${catalog.verifiedAt}T12:00:00`).toLocaleDateString("de-DE");
   const catalogAgeDays = Math.max(0, Math.floor((currentTime - new Date(`${catalog.verifiedAt}T12:00:00`).getTime()) / 86_400_000));
-  const catalogReviewOverdue = new Date(`${catalog.nextReviewDue}T23:59:59`).getTime() < currentTime;
+  const lastAutomaticCheckTime = lastOnlineCatalogCheck ? new Date(lastOnlineCatalogCheck).getTime() : 0;
+  const automaticCheckIsRecent = lastAutomaticCheckTime > 0 && currentTime - lastAutomaticCheckTime < 7 * 86_400_000;
+  const catalogReviewOverdue = new Date(`${catalog.nextReviewDue}T23:59:59`).getTime() < currentTime && !automaticCheckIsRecent;
   const nextReviewDate = new Date(`${catalog.nextReviewDue}T12:00:00`).toLocaleDateString("de-DE");
   const catalogStatusText = catalogStatus === "checking"
     ? "Katalog wird geprüft …"
@@ -1755,12 +1769,12 @@ export default function BeeApp({ displayName }: { displayName: string }) {
 
       <section className={`local-status-card ${online ? "is-online" : "is-offline"}`}>
         <span className="local-status-icon">{online ? "✓" : "⌁"}</span>
-        <div><b>{online ? "Online · automatischer Rechts-, Katalog- und Quellenabgleich aktiv" : "Offline bereit · letzter geprüfter Stand bleibt verfügbar"}</b><p>Die App prüft beim Online-Start, bei Rückkehr in die App und alle sechs Stunden auf eine veröffentlichte Aktualisierung und die Erreichbarkeit der amtlichen Hauptquellen. Persönliche Daten bleiben lokal.{lastOnlineCatalogCheck ? ` Letzter Online-Abgleich: ${new Date(lastOnlineCatalogCheck).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })} Uhr.` : ""}{sourceCheck ? ` Amtliche Quellen: ${sourceCheck.allReachable ? "erreichbar" : "teilweise nicht erreichbar"}.` : ""}</p></div>
+        <div><b>{online ? "Online · automatischer Rechts-, Katalog- und Quellenabgleich aktiv" : "Offline bereit · letzter geprüfter Stand bleibt verfügbar"}</b><p>Die App prüft beim Online-Start, bei Rückkehr in die App und alle sechs Stunden automatisch. Persönliche Daten bleiben lokal.{lastOnlineCatalogCheck ? ` Letzter Abgleich: ${new Date(lastOnlineCatalogCheck).toLocaleString("de-DE", { dateStyle: "short", timeStyle: "short" })} Uhr.` : ""}{sourceCheck ? ` ${sourceCheck.sources.filter((source) => source.ok).length} von ${sourceCheck.sources.length} amtlichen Quellen waren erreichbar${sourceCheck.allReachable ? "." : "; nicht erreichbare Seiten werden beim nächsten Abgleich erneut versucht."}` : ""}</p></div>
         <button onClick={() => void refreshCatalog(true)} disabled={!online || catalogStatus === "checking"}>{online ? catalogStatusText : "Offline-Katalog aktiv"}</button>
       </section>
 
       <section className={`catalog-freshness ${catalogReviewOverdue ? "is-overdue" : ""}`}>
-        <span>{catalogReviewOverdue ? "!" : "✓"}</span><div><b>{catalogReviewOverdue ? "Fachliche Überprüfung überfällig" : "Rechts- und Richtlinienstand geprüft"}</b><p>Geprüft am {catalogDate} · {catalogAgeDays} Tage alt · nächste Prüfung spätestens {nextReviewDate}. {catalogReviewOverdue ? "Vor einer Behandlung unbedingt die amtlichen Quellen und Packungsbeilage direkt prüfen." : "Freigegebene Fachstände werden automatisch geladen; die amtlichen Hauptquellen werden zusätzlich online überwacht."}</p></div><button onClick={() => switchView("legal")}>Quellen ansehen →</button>
+        <span>{catalogReviewOverdue ? "!" : "✓"}</span><div><b>{catalogReviewOverdue ? "Automatischer Abgleich länger nicht möglich" : automaticCheckIsRecent ? "Automatischer Quellenabgleich aktuell" : "Rechts- und Richtlinienstand geprüft"}</b><p>Fachstand vom {catalogDate} · {catalogAgeDays} Tage alt.{lastOnlineCatalogCheck ? ` Automatisch abgeglichen am ${new Date(lastOnlineCatalogCheck).toLocaleString("de-DE", { dateStyle: "short", timeStyle: "short" })} Uhr.` : ` Nächste fachliche Prüfung spätestens ${nextReviewDate}.`} {catalogReviewOverdue ? "Vor einer Behandlung bitte die amtlichen Quellen und Packungsbeilage direkt prüfen." : "Neue freigegebene Fachstände lädt die App automatisch; vor jeder Arzneimittelanwendung bleibt die aktuelle Packungsbeilage verbindlich."}</p></div><button onClick={() => switchView("legal")}>Quellen ansehen →</button>
       </section>
 
       <section className="alert-card">
